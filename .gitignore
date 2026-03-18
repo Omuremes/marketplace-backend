@@ -1,0 +1,49 @@
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+*.egg
+*.egg-info/
+dist/
+build/
+eggs/
+parts/
+var/
+sdist/
+develop-eggs/
+.installed.cfg
+lib/
+lib64/
+
+# Virtual environments
+.venv/
+venv/
+ENV/
+env/
+
+# Secrets — never commit
+.env
+
+# Alembic generated (optional, usually committed)
+# alembic/versions/
+
+# IDE
+.idea/
+.vscode/
+*.swp
+*.swo
+
+# OS
+.DS_Store
+Thumbs.db
+
+# pytest / test cache
+.pytest_cache/
+.coverage
+htmlcov/
+
+# mypy / ruff cache
+.mypy_cache/
+.ruff_cache/

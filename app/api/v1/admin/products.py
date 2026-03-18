@@ -1,0 +1,164 @@
+from fastapi import APIRouter, Depends, HTTPException, Query, UploadFile, File
+from app.api.deps import get_product_service, get_current_admin
+from app.application.services.product_service import ProductService
+from app.application.dto.product_dto import ProductDetailsDTO, ProductAttributeDTO, MoneyDTO
+from app.infrastructure.storage.minio_client import get_storage_client, MinioStorageClient
+from typing import List, Optional, Any
+from pydantic import BaseModel, HttpUrl
+
+router = APIRouter()
+
+class AdminProductCreate(BaseModel):
+    name: str
+    price: MoneyDTO
+    stock: int
+    attributes: List[ProductAttributeDTO]
+
+class AdminProductUpdate(BaseModel):
+    name: Optional[str] = None
+    price: Optional[MoneyDTO] = None
+    stock: Optional[int] = None
+    attributes: Optional[List[ProductAttributeDTO]] = None
+
+class AdminProductResponse(BaseModel):
+    id: str
+    name: str
+    price: MoneyDTO
+    stock: int
+    image_url: Optional[HttpUrl] = None
+    thumbnail_url: Optional[HttpUrl] = None
+    attributes: List[ProductAttributeDTO]
+
+class ImageUploadResponse(BaseModel):
+    image_url: HttpUrl
+    thumbnail_url: HttpUrl
+
+@router.get("", response_model=dict)
+async def list_products(
+    limit: int = Query(50, ge=1, le=100),
+    cursor: Optional[str] = Query(None),
+    current_admin: str = Depends(get_current_admin),
+    product_service: ProductService = Depends(get_product_service)
+):
+    dtos, next_cursor = await product_service.list_products(limit=limit, cursor=cursor)
+    
+    admin_dtos = []
+    for dto in dtos:
+        # We need attributes for admin list too based on OpenAPI
+        # the list_products doesn't return attributes in ProductListItemDTO
+        # For simplicity, we fetch details or extend ProductListItemDTO.
+        product = await product_service.get_product_details(dto.id)
+        if product:
+             admin_dtos.append(AdminProductResponse(
+                 id=product.id,
+                 name=product.name,
+                 price=dto.price,
+                 stock=dto.stock,
+                 image_url=product.image_url,
+                 thumbnail_url=dto.thumbnail_url,
+                 attributes=product.attributes
+             ))
+    return {"items": admin_dtos, "next_cursor": next_cursor}
+
+@router.post("", response_model=AdminProductResponse, status_code=201)
+async def create_product(
+    data: AdminProductCreate,
+    current_admin: str = Depends(get_current_admin),
+    product_service: ProductService = Depends(get_product_service)
+):
+    attr_dicts = [{"key": a.key, "value": a.value} for a in data.attributes]
+    product = await product_service.create_product(
+        name=data.name,
+        price_amount=data.price.amount,
+        price_currency=data.price.currency,
+        stock=data.stock,
+        attributes=attr_dicts
+    )
+    return AdminProductResponse(
+        id=product.id,
+        name=product.name,
+        price=data.price,
+        stock=product.stock,
+        attributes=data.attributes
+    )
+
+@router.get("/{product_id}", response_model=AdminProductResponse)
+async def get_product(
+    product_id: str,
+    current_admin: str = Depends(get_current_admin),
+    product_service: ProductService = Depends(get_product_service)
+):
+    product = await product_service.get_product_details(product_id)
+    if not product:
+         raise HTTPException(status_code=404, detail="Product not found")
+    # To return stock we'd need to fetch actual product entity or add it to DetailsDTO
+    # Since it's a prototype, making another call or modifying DTO
+    raw_product = await product_service.uow.products.get_by_id(product_id)
+    return AdminProductResponse(
+        id=product.id,
+        name=product.name,
+        price=MoneyDTO(amount=raw_product.price_amount, currency=raw_product.price_currency),
+        stock=raw_product.stock,
+        image_url=product.image_url,
+        thumbnail_url=product.image_url,
+        attributes=product.attributes
+    )
+
+@router.put("/{product_id}", response_model=AdminProductResponse)
+async def update_product(
+    product_id: str,
+    data: AdminProductUpdate,
+    current_admin: str = Depends(get_current_admin),
+    product_service: ProductService = Depends(get_product_service)
+):
+    updates = {}
+    if data.name is not None: 
+        updates["name"] = data.name
+    if data.price is not None:
+        updates["price_amount"] = data.price.amount
+        updates["price_currency"] = data.price.currency
+    if data.stock is not None: 
+        updates["stock"] = data.stock
+    if data.attributes is not None:
+        updates["attributes"] = [{"key": a.key, "value": a.value} for a in data.attributes]
+        
+    product = await product_service.update_product(product_id, updates)
+    if not product:
+         raise HTTPException(status_code=404, detail="Product not found")
+         
+    attr_dtos = [ProductAttributeDTO(key=a.get("key",""), value=a.get("value","")) for a in product.attributes]
+    return AdminProductResponse(
+        id=product.id,
+        name=product.name,
+        price=MoneyDTO(amount=product.price_amount, currency=product.price_currency),
+        stock=product.stock,
+        image_url=product.image_url,
+        thumbnail_url=product.thumbnail_url,
+        attributes=attr_dtos
+    )
+
+@router.delete("/{product_id}", status_code=204)
+async def delete_product(
+    product_id: str,
+    current_admin: str = Depends(get_current_admin),
+    product_service: ProductService = Depends(get_product_service)
+):
+    deleted = await product_service.delete_product(product_id)
+    if not deleted:
+         raise HTTPException(status_code=404, detail="Product not found")
+
+@router.post("/{product_id}/image", response_model=ImageUploadResponse)
+async def upload_product_image(
+    product_id: str,
+    file: UploadFile = File(...),
+    current_admin: str = Depends(get_current_admin),
+    product_service: ProductService = Depends(get_product_service),
+    storage_client: MinioStorageClient = Depends(get_storage_client)
+):
+    content = await file.read()
+    url = storage_client.upload_file(file.filename, content, file.content_type)
+    # Using same URL for thumbnail for prototype
+    product = await product_service.update_image(product_id, url, url)
+    if not product:
+         raise HTTPException(status_code=404, detail="Product not found")
+    return ImageUploadResponse(image_url=url, thumbnail_url=url)
