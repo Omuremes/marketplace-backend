@@ -1,4 +1,4 @@
-from typing import Optional, List
+from typing import Optional
 from datetime import date
 from app.application.uow import UnitOfWork
 from app.domain.entities.offer import Offer
@@ -26,10 +26,14 @@ class OfferService:
             if not offer:
                 return None
             
-            if seller_id is not None: offer.seller_id = seller_id
-            if price_amount is not None: offer.price_amount = price_amount
-            if price_currency is not None: offer.price_currency = price_currency
-            if delivery_date is not None: offer.delivery_date = delivery_date
+            if seller_id is not None: 
+                offer.seller_id = seller_id
+            if price_amount is not None:    
+                offer.price_amount = price_amount
+            if price_currency is not None: 
+                offer.price_currency = price_currency
+            if delivery_date is not None: 
+                offer.delivery_date = delivery_date
             
             await uow.offers.update(offer)
             await uow.commit()

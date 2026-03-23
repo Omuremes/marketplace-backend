@@ -20,7 +20,10 @@ class SqlAlchemyProductRepository(ProductRepository):
         stmt = (
             select(ProductModel)
             .where(ProductModel.id == product_id)
-            .options(selectinload(ProductModel.offers).selectinload(OfferModel.seller))
+            .options(
+                selectinload(ProductModel.offers).selectinload(OfferModel.seller),
+                selectinload(ProductModel.attributes)
+            )
         )
         result = await self.session.execute(stmt)
         model = result.scalar_one_or_none()
@@ -31,8 +34,10 @@ class SqlAlchemyProductRepository(ProductRepository):
     async def list_products(self, limit: int, cursor: Optional[str] = None) -> List[Product]:
         stmt = (
             select(ProductModel)
-            # Eagerly load offers and their sellers to avoid lazy load in async context
-            .options(selectinload(ProductModel.offers).selectinload(OfferModel.seller))
+            .options(
+                selectinload(ProductModel.offers).selectinload(OfferModel.seller),
+                selectinload(ProductModel.attributes)
+            )
             .order_by(ProductModel.id)
             .limit(limit)
         )

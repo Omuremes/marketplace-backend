@@ -1,9 +1,9 @@
 from fastapi import APIRouter, Depends, HTTPException, Query, UploadFile, File
 from app.api.deps import get_product_service, get_current_admin
 from app.application.services.product_service import ProductService
-from app.application.dto.product_dto import ProductDetailsDTO, ProductAttributeDTO, MoneyDTO
+from app.application.dto.product_dto import ProductAttributeDTO, MoneyDTO
 from app.infrastructure.storage.minio_client import get_storage_client, MinioStorageClient
-from typing import List, Optional, Any
+from typing import List, Optional
 from pydantic import BaseModel, HttpUrl
 
 router = APIRouter()
@@ -88,20 +88,18 @@ async def get_product(
     current_admin: str = Depends(get_current_admin),
     product_service: ProductService = Depends(get_product_service)
 ):
-    product = await product_service.get_product_details(product_id)
-    if not product:
-         raise HTTPException(status_code=404, detail="Product not found")
-    # To return stock we'd need to fetch actual product entity or add it to DetailsDTO
-    # Since it's a prototype, making another call or modifying DTO
-    raw_product = await product_service.uow.products.get_by_id(product_id)
+    raw_product = await product_service.get_product_raw(product_id)
+    if not raw_product:
+        raise HTTPException(status_code=404, detail="Product not found")
+    attr_dtos = [ProductAttributeDTO(key=a.get("key", ""), value=a.get("value", "")) for a in raw_product.attributes]
     return AdminProductResponse(
-        id=product.id,
-        name=product.name,
+        id=raw_product.id,
+        name=raw_product.name,
         price=MoneyDTO(amount=raw_product.price_amount, currency=raw_product.price_currency),
         stock=raw_product.stock,
-        image_url=product.image_url,
-        thumbnail_url=product.image_url,
-        attributes=product.attributes
+        image_url=raw_product.image_url,
+        thumbnail_url=raw_product.thumbnail_url,
+        attributes=attr_dtos
     )
 
 @router.put("/{product_id}", response_model=AdminProductResponse)
@@ -156,9 +154,11 @@ async def upload_product_image(
     storage_client: MinioStorageClient = Depends(get_storage_client)
 ):
     content = await file.read()
-    url = storage_client.upload_file(file.filename, content, file.content_type)
-    # Using same URL for thumbnail for prototype
-    product = await product_service.update_image(product_id, url, url)
+    object_key = storage_client.upload_file(file.filename, content, file.content_type)
+    # Using same key for thumbnail for prototype
+    product = await product_service.update_image(product_id, object_key, object_key)
     if not product:
          raise HTTPException(status_code=404, detail="Product not found")
+         
+    url = storage_client.get_file_url(object_key)
     return ImageUploadResponse(image_url=url, thumbnail_url=url)

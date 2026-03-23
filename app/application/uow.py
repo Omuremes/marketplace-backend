@@ -2,6 +2,7 @@ import abc
 from app.domain.entities.product import Product
 from app.domain.entities.seller import Seller
 from app.domain.entities.offer import Offer
+from app.domain.entities.admin import Admin
 from typing import List, Optional
 
 class ProductRepository(abc.ABC):
@@ -38,6 +39,19 @@ class SellerRepository(abc.ABC):
     async def list_sellers(self) -> List[Seller]:
         pass
 
+    @abc.abstractmethod
+    async def get_by_email(self, email: str) -> Optional[Seller]:
+        pass
+
+class AdminRepository(abc.ABC):
+    @abc.abstractmethod
+    async def add(self, admin: Admin) -> None:
+        pass
+
+    @abc.abstractmethod
+    async def get_by_email(self, email: str) -> Optional[Admin]:
+        pass
+
 class OfferRepository(abc.ABC):
     @abc.abstractmethod
     async def add(self, offer: Offer) -> None:
@@ -59,6 +73,7 @@ class UnitOfWork(abc.ABC):
     products: ProductRepository
     sellers: SellerRepository
     offers: OfferRepository
+    admins: AdminRepository
 
     async def __aenter__(self):
         return self
@@ -76,3 +91,4 @@ class UnitOfWork(abc.ABC):
     @abc.abstractmethod
     async def rollback(self):
         pass
+

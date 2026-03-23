@@ -11,8 +11,8 @@ class Product:
     price_amount: float
     price_currency: str
     stock: int
-    image_url: Optional[str] = None
-    thumbnail_url: Optional[str] = None
+    image_object_key: Optional[str] = None
+    thumbnail_object_key: Optional[str] = None
     attributes: List[Dict[str, str]] = field(default_factory=list)
     offers: List[Offer] = field(default_factory=list)
     nearest_delivery_date: Optional[date] = None

@@ -1,31 +1,34 @@
 from typing import List, Optional, Dict, Any
 from app.application.uow import UnitOfWork
 from app.domain.entities.product import Product
-from app.application.dto.product_dto import ProductListItemDTO, ProductDetailsDTO, ProductAttributeDTO, MoneyDTO, OfferWithSellerDTO, SellerDTO
+from app.infrastructure.storage.minio_client import get_storage_client
+from app.application.dto.product_dto import (
+    ProductListItemDTO, ProductDetailsDTO, ProductAttributeDTO,
+    MoneyDTO, PublicOfferDTO, SellerDTO
+)
 
 class ProductService:
     def __init__(self, uow: UnitOfWork):
         self.uow = uow
+        self.storage_client = get_storage_client()
 
     async def list_products(self, limit: int = 20, cursor: Optional[str] = None) -> tuple[List[ProductListItemDTO], str | None]:
         async with self.uow as uow:
             products = await uow.products.list_products(limit=limit, cursor=cursor)
-            
-            # Convert to DTO
+
             dtos = []
             for p in products:
+                thumb_url = self.storage_client.get_file_url(p.thumbnail_object_key) if p.thumbnail_object_key else None
                 dtos.append(ProductListItemDTO(
                     id=p.id,
                     name=p.name,
-                    thumbnail_url=p.thumbnail_url,
+                    thumbnail_url=thumb_url,
                     price=MoneyDTO(amount=p.price_amount, currency=p.price_currency),
                     stock=p.stock,
                     nearest_delivery_date=p.nearest_delivery_date
                 ))
-            
-            # Simple cursor logic for infinite scroll
+
             next_cursor = products[-1].id if len(products) == limit else None
-            
             return dtos, next_cursor
 
     async def get_product_details(self, product_id: str, offers_sort: str = "price") -> Optional[ProductDetailsDTO]:
@@ -33,35 +36,43 @@ class ProductService:
             product = await uow.products.get_by_id(product_id)
             if not product:
                 return None
-                
-            offers = product.offers
-            # Sort offers
+
+            offers = list(product.offers)
             if offers_sort == "price":
                 offers.sort(key=lambda o: o.price_amount)
             elif offers_sort == "delivery_date":
                 offers.sort(key=lambda o: o.delivery_date)
-                
+
             offer_dtos = []
             for o in offers:
-                seller_dto = SellerDTO(id=o.seller.id, name=o.seller.name, rating=o.seller.rating) if o.seller else None
-                offer_dtos.append(OfferWithSellerDTO(
-                    id=o.id,
-                    product_id=o.product_id,
-                    seller_id=o.seller_id,
-                    price=MoneyDTO(amount=o.price_amount, currency=o.price_currency),
-                    delivery_date=o.delivery_date,
-                    seller=seller_dto
-                ))
-                
-            attribute_dtos = [ProductAttributeDTO(key=attr.get("key", ""), value=attr.get("value", "")) for attr in product.attributes]
-            
+                if o.seller:
+                    seller_dto = SellerDTO(id=o.seller.id, name=o.seller.name, rating=o.seller.rating)
+                    offer_dtos.append(PublicOfferDTO(
+                        id=o.id,
+                        seller=seller_dto,
+                        price=MoneyDTO(amount=o.price_amount, currency=o.price_currency),
+                        delivery_date=o.delivery_date,
+                    ))
+
+            attribute_dtos = [
+                ProductAttributeDTO(key=attr.get("key", ""), value=attr.get("value", ""))
+                for attr in product.attributes
+            ]
+
+            img_url = self.storage_client.get_file_url(product.image_object_key) if product.image_object_key else None
+
             return ProductDetailsDTO(
                 id=product.id,
                 name=product.name,
-                image_url=product.image_url,
+                image_url=img_url,
                 attributes=attribute_dtos,
-                offers=offer_dtos
+                offers=offer_dtos,
             )
+
+    async def get_product_raw(self, product_id: str) -> Optional[Product]:
+        """Returns full domain entity including stock (used by admin endpoints)."""
+        async with self.uow as uow:
+            return await uow.products.get_by_id(product_id)
 
     async def create_product(self, name: str, price_amount: float, price_currency: str, stock: int, attributes: List[Dict[str, str]]) -> Product:
         async with self.uow as uow:
@@ -100,13 +111,13 @@ class ProductService:
             await uow.commit()
             return True
 
-    async def update_image(self, product_id: str, image_url: str, thumbnail_url: str) -> Optional[Product]:
+    async def update_image(self, product_id: str, image_object_key: str, thumbnail_object_key: str) -> Optional[Product]:
         async with self.uow as uow:
             product = await uow.products.get_by_id(product_id)
             if not product:
                 return None
-            product.image_url = image_url
-            product.thumbnail_url = thumbnail_url
+            product.image_object_key = image_object_key
+            product.thumbnail_object_key = thumbnail_object_key
             await uow.products.update(product)
             await uow.commit()
             return product

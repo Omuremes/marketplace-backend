@@ -34,9 +34,13 @@ class MinioStorageClient:
             length=len(content),
             content_type=content_type
         )
-        # Using localhost public URL for prototype
+        return unique_name
+
+    def get_file_url(self, object_key: str) -> str:
+        if object_key.startswith("http://") or object_key.startswith("https://"):
+            return object_key
         protocol = "https" if settings.MINIO_SECURE else "http"
-        return f"{protocol}://{settings.MINIO_ENDPOINT}/{self.bucket_name}/{unique_name}"
+        return f"{protocol}://{settings.MINIO_ENDPOINT}/{self.bucket_name}/{object_key}"
 
 minio_client = MinioStorageClient()
 

@@ -12,7 +12,7 @@ sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 from app.infrastructure.config.settings import settings
 from app.infrastructure.db.session import Base
-from app.infrastructure.db.models import ProductModel, SellerModel, OfferModel  # Register models
+from app.infrastructure.db.models import ProductModel, SellerModel, OfferModel, ProductAttributeModel, AdminModel  # Register models
 
 config = context.config
 

@@ -18,8 +18,15 @@ async def seed_database():
 
         print("Seeding Sellers...")
         sellers = []
+        from app.infrastructure.auth.password import get_password_hash
+        default_hash = get_password_hash("password")
         for i in range(10):
-            seller = Seller.create(name=f"Seller {i+1}", rating=round(random.uniform(3.0, 5.0), 1))
+            seller = Seller.create(
+                name=f"Seller {i+1}", 
+                email=f"seller{i+1}@example.com", 
+                password_hash=default_hash, 
+                rating=round(random.uniform(3.0, 5.0), 1)
+            )
             await uow.sellers.add(seller)
             sellers.append(seller)
 
@@ -40,8 +47,8 @@ async def seed_database():
                 attributes=attributes
             )
             # Default placeholder image
-            product.image_url = "https://via.placeholder.com/600"
-            product.thumbnail_url = "https://via.placeholder.com/150"
+            product.image_object_key = "https://via.placeholder.com/600"
+            product.thumbnail_object_key = "https://via.placeholder.com/150"
             await uow.products.add(product)
 
             # 2 to 6 offers per product

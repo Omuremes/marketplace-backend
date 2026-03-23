@@ -26,3 +26,12 @@ class SqlAlchemySellerRepository(SellerRepository):
         if model:
             return DomainMapper.to_seller_domain(model)
         return None
+
+    async def get_by_email(self, email: str) -> Optional[Seller]:
+        stmt = select(SellerModel).where(SellerModel.email == email)
+        result = await self.session.execute(stmt)
+        model = result.scalars().first()
+        if model:
+            return DomainMapper.to_seller_domain(model)
+        return None
+

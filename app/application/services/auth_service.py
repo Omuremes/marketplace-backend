@@ -1,28 +1,55 @@
-import jwt
-from datetime import datetime, timedelta, timezone
-from passlib.context import CryptContext
-from app.infrastructure.config.settings import settings
-
-pwd_context = CryptContext(schemes=["bcrypt"], deprecated="auto")
+from app.application.uow import UnitOfWork
+from app.domain.entities.seller import Seller
+from app.infrastructure.auth.jwt import create_access_token
+from app.infrastructure.auth.password import verify_password, get_password_hash
+from typing import Optional
 
 class AuthService:
     @staticmethod
     def verify_password(plain_password: str, hashed_password: str) -> bool:
-        return pwd_context.verify(plain_password, hashed_password)
+        return verify_password(plain_password, hashed_password)
 
     @staticmethod
     def get_password_hash(password: str) -> str:
-        return pwd_context.hash(password)
+        return get_password_hash(password)
 
     @staticmethod
     def create_access_token(data: dict) -> str:
-        to_encode = data.copy()
-        expire = datetime.now(timezone.utc) + timedelta(minutes=settings.ACCESS_TOKEN_EXPIRE_MINUTES)
-        to_encode.update({"exp": expire})
-        encoded_jwt = jwt.encode(to_encode, settings.SECRET_KEY, algorithm=settings.ALGORITHM)
-        return encoded_jwt
+        return create_access_token(data)
 
     @staticmethod
-    def authenticate_admin(username: str, password: str) -> bool:
-        # In a real app, query DB. Here we use the prototype settings
-        return username == settings.ADMIN_USERNAME and password == settings.ADMIN_PASSWORD
+    def create_refresh_token(data: dict) -> str:
+        from app.infrastructure.auth.jwt import create_refresh_token
+        return create_refresh_token(data)
+
+    @staticmethod
+    async def authenticate_admin(uow: UnitOfWork, email: str, password: str) -> bool:
+        async with uow:
+            admin = await uow.admins.get_by_email(email)
+            if not admin:
+                return False
+            return AuthService.verify_password(password, admin.password_hash)
+
+    @staticmethod
+    async def authenticate_seller(uow: UnitOfWork, email: str, password: str) -> Optional[Seller]:
+        async with uow:
+            seller = await uow.sellers.get_by_email(email)
+            if not seller:
+                return None
+            if not AuthService.verify_password(password, seller.password_hash):
+                return None
+            return seller
+
+    @staticmethod
+    async def register_seller(uow: UnitOfWork, name: str, email: str, password: str) -> Seller:
+        async with uow:
+            existing = await uow.sellers.get_by_email(email)
+            if existing:
+                raise ValueError("Seller with this email already exists")
+            
+            hashed_pw = AuthService.get_password_hash(password)
+            seller = Seller.create(name=name, email=email, password_hash=hashed_pw, rating=0.0)
+            await uow.sellers.add(seller)
+            await uow.commit() # Save changes
+            return seller
+
