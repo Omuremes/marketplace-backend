@@ -12,12 +12,21 @@ class ProductService:
         self.uow = uow
         self.storage_client = get_storage_client()
 
-    async def list_products(self, limit: int = 20, cursor: Optional[str] = None) -> tuple[List[ProductListItemDTO], str | None]:
+    async def list_products(
+        self,
+        limit: int = 20,
+        cursor: Optional[str] = None,
+        search: Optional[str] = None,
+    ) -> tuple[List[ProductListItemDTO], str | None]:
         async with self.uow as uow:
-            products = await uow.products.list_products(limit=limit, cursor=cursor)
+            # Fetch one extra row to determine whether next page exists.
+            products = await uow.products.list_products(limit=limit + 1, cursor=cursor, search=search)
+
+            has_next_page = len(products) > limit
+            page_products = products[:limit]
 
             dtos = []
-            for p in products:
+            for p in page_products:
                 thumb_url = self.storage_client.get_file_url(p.thumbnail_object_key) if p.thumbnail_object_key else None
                 dtos.append(ProductListItemDTO(
                     id=p.id,
@@ -28,7 +37,7 @@ class ProductService:
                     nearest_delivery_date=p.nearest_delivery_date
                 ))
 
-            next_cursor = products[-1].id if len(products) == limit else None
+            next_cursor = page_products[-1].id if has_next_page and page_products else None
             return dtos, next_cursor
 
     async def get_product_details(self, product_id: str, offers_sort: str = "price") -> Optional[ProductDetailsDTO]:

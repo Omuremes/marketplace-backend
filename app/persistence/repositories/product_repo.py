@@ -5,6 +5,7 @@ from typing import List, Optional
 from app.application.uow import ProductRepository
 from app.domain.entities.product import Product
 from app.infrastructure.db.models import ProductModel, OfferModel
+from app.persistence.mappers.product_mapper import DomainMapper
 
 
 class SqlAlchemyProductRepository(ProductRepository):
@@ -31,7 +32,12 @@ class SqlAlchemyProductRepository(ProductRepository):
             return DomainMapper.to_product_domain(model)
         return None
 
-    async def list_products(self, limit: int, cursor: Optional[str] = None) -> List[Product]:
+    async def list_products(
+        self,
+        limit: int,
+        cursor: Optional[str] = None,
+        search: Optional[str] = None,
+    ) -> List[Product]:
         stmt = (
             select(ProductModel)
             .options(
@@ -41,6 +47,12 @@ class SqlAlchemyProductRepository(ProductRepository):
             .order_by(ProductModel.id)
             .limit(limit)
         )
+
+        if search:
+            search_value = search.strip()
+            if search_value:
+                stmt = stmt.where(ProductModel.name.ilike(f"%{search_value}%"))
+
         if cursor:
             stmt = stmt.where(ProductModel.id > cursor)
 
@@ -51,7 +63,8 @@ class SqlAlchemyProductRepository(ProductRepository):
     async def count_products(self) -> int:
         stmt = select(func.count(ProductModel.id))
         result = await self.session.execute(stmt)
-        return result.scalar()
+        count = result.scalar()
+        return int(count or 0)
 
     async def update(self, product: Product) -> None:
         model = DomainMapper.to_product_model(product)
@@ -65,4 +78,4 @@ class SqlAlchemyProductRepository(ProductRepository):
             await self.session.flush()
 
 
-from app.persistence.mappers.product_mapper import DomainMapper
+

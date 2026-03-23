@@ -15,7 +15,12 @@ class ProductRepository(abc.ABC):
         pass
 
     @abc.abstractmethod
-    async def list_products(self, limit: int, cursor: Optional[str] = None) -> List[Product]:
+    async def list_products(
+        self,
+        limit: int,
+        cursor: Optional[str] = None,
+        search: Optional[str] = None,
+    ) -> List[Product]:
         pass
         
     @abc.abstractmethod
