@@ -86,19 +86,24 @@ async def create_product(
 async def get_product(
     product_id: str,
     current_admin: str = Depends(get_current_admin),
-    product_service: ProductService = Depends(get_product_service)
+    product_service: ProductService = Depends(get_product_service),
+    storage_client: MinioStorageClient = Depends(get_storage_client)
 ):
     raw_product = await product_service.get_product_raw(product_id)
     if not raw_product:
         raise HTTPException(status_code=404, detail="Product not found")
+        
     attr_dtos = [ProductAttributeDTO(key=a.get("key", ""), value=a.get("value", "")) for a in raw_product.attributes]
+    image_url = storage_client.get_file_url(raw_product.image_object_key) if raw_product.image_object_key else None
+    thumbnail_url = storage_client.get_file_url(raw_product.thumbnail_object_key) if raw_product.thumbnail_object_key else None
+    
     return AdminProductResponse(
         id=raw_product.id,
         name=raw_product.name,
         price=MoneyDTO(amount=raw_product.price_amount, currency=raw_product.price_currency),
         stock=raw_product.stock,
-        image_url=raw_product.image_url,
-        thumbnail_url=raw_product.thumbnail_url,
+        image_url=image_url,
+        thumbnail_url=thumbnail_url,
         attributes=attr_dtos
     )
 
@@ -107,7 +112,8 @@ async def update_product(
     product_id: str,
     data: AdminProductUpdate,
     current_admin: str = Depends(get_current_admin),
-    product_service: ProductService = Depends(get_product_service)
+    product_service: ProductService = Depends(get_product_service),
+    storage_client: MinioStorageClient = Depends(get_storage_client)
 ):
     updates = {}
     if data.name is not None: 
@@ -125,13 +131,16 @@ async def update_product(
          raise HTTPException(status_code=404, detail="Product not found")
          
     attr_dtos = [ProductAttributeDTO(key=a.get("key",""), value=a.get("value","")) for a in product.attributes]
+    image_url = storage_client.get_file_url(product.image_object_key) if product.image_object_key else None
+    thumbnail_url = storage_client.get_file_url(product.thumbnail_object_key) if product.thumbnail_object_key else None
+    
     return AdminProductResponse(
         id=product.id,
         name=product.name,
         price=MoneyDTO(amount=product.price_amount, currency=product.price_currency),
         stock=product.stock,
-        image_url=product.image_url,
-        thumbnail_url=product.thumbnail_url,
+        image_url=image_url,
+        thumbnail_url=thumbnail_url,
         attributes=attr_dtos
     )
 

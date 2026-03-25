@@ -40,7 +40,10 @@ class MinioStorageClient:
         if object_key.startswith("http://") or object_key.startswith("https://"):
             return object_key
         protocol = "https" if settings.MINIO_SECURE else "http"
-        return f"{protocol}://{settings.MINIO_ENDPOINT}/{self.bucket_name}/{object_key}"
+        # Since this API is consumed by a client browser on the host, 
+        # we must return a URL resolvable by the browser (localhost)
+        endpoint = getattr(settings, "MINIO_PUBLIC_ENDPOINT", "localhost:9000")
+        return f"{protocol}://{endpoint}/{self.bucket_name}/{object_key}"
 
 minio_client = MinioStorageClient()
 
