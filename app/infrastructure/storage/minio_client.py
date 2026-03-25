@@ -3,6 +3,7 @@ from minio.error import S3Error
 import io
 import uuid
 from app.infrastructure.config.settings import settings
+from datetime import timedelta
 
 class MinioStorageClient:
     def __init__(self):
@@ -11,6 +12,17 @@ class MinioStorageClient:
             access_key=settings.MINIO_ACCESS_KEY,
             secret_key=settings.MINIO_SECRET_KEY,
             secure=settings.MINIO_SECURE,
+            region="us-east-1"
+        )
+        # Client specifically initialized with the public endpoint
+        # so that presigned URLs are signed for the correct Host header.
+        public_endpoint = getattr(settings, "MINIO_PUBLIC_ENDPOINT", "localhost:9000")
+        self.presigned_client = Minio(
+            public_endpoint,
+            access_key=settings.MINIO_ACCESS_KEY,
+            secret_key=settings.MINIO_SECRET_KEY,
+            secure=settings.MINIO_SECURE,
+            region="us-east-1"
         )
         self.bucket_name = settings.MINIO_BUCKET_NAME
         self._ensure_bucket()
@@ -19,9 +31,6 @@ class MinioStorageClient:
         try:
             if not self.client.bucket_exists(self.bucket_name):
                 self.client.make_bucket(self.bucket_name)
-                # Setting public policy for prototype simplicity
-                policy = f'{{"Version":"2012-10-17","Statement":[{{"Effect":"Allow","Principal":{{"AWS":["*"]}},"Action":["s3:GetObject"],"Resource":["arn:aws:s3:::{self.bucket_name}/*"]}}]}}'
-                self.client.set_bucket_policy(self.bucket_name, policy)
         except S3Error as e:
             print(f"MinIO bucket error: {e}")
 
@@ -39,11 +48,10 @@ class MinioStorageClient:
     def get_file_url(self, object_key: str) -> str:
         if object_key.startswith("http://") or object_key.startswith("https://"):
             return object_key
-        protocol = "https" if settings.MINIO_SECURE else "http"
-        # Since this API is consumed by a client browser on the host, 
-        # we must return a URL resolvable by the browser (localhost)
-        endpoint = getattr(settings, "MINIO_PUBLIC_ENDPOINT", "localhost:9000")
-        return f"{protocol}://{endpoint}/{self.bucket_name}/{object_key}"
+            
+        # Generate the presigned URL using the presigned_client (signed for localhost:9000)
+        url = self.presigned_client.presigned_get_object(self.bucket_name, object_key, expires=timedelta(hours=1))
+        return url
 
 minio_client = MinioStorageClient()
 

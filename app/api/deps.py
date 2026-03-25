@@ -38,7 +38,7 @@ async def get_current_admin(credentials: HTTPAuthorizationCredentials = Depends(
         admin = await uow.admins.get_by_email(email)
         if not admin:
             raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Admin not found")
-    return admin.email
+    return admin.id
 
 async def get_current_seller(credentials: HTTPAuthorizationCredentials = Depends(security), uow: UnitOfWork = Depends(get_uow)) -> str:
     try:

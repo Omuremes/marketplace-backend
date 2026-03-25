@@ -73,7 +73,8 @@ async def create_product(
         price_amount=data.price.amount,
         price_currency=data.price.currency,
         stock=data.stock,
-        attributes=attr_dicts
+        attributes=attr_dicts,
+        admin_id=current_admin
     )
     return AdminProductResponse(
         id=product.id,
@@ -127,7 +128,7 @@ async def update_product(
     if data.attributes is not None:
         updates["attributes"] = [{"key": a.key, "value": a.value} for a in data.attributes]
         
-    product = await product_service.update_product(product_id, updates)
+    product = await product_service.update_product(product_id, updates, admin_id=current_admin)
     if not product:
          raise HTTPException(status_code=404, detail="Product not found")
          
@@ -151,9 +152,12 @@ async def delete_product(
     current_admin: str = Depends(get_current_admin),
     product_service: ProductService = Depends(get_product_service)
 ):
-    deleted = await product_service.delete_product(product_id)
+    deleted = await product_service.delete_product(product_id, admin_id=current_admin)
     if not deleted:
          raise HTTPException(status_code=404, detail="Product not found")
+
+from io import BytesIO
+from PIL import Image
 
 @router.post("/{product_id}/image", response_model=ImageUploadResponse)
 async def upload_product_image(
@@ -165,10 +169,29 @@ async def upload_product_image(
 ):
     content = await file.read()
     object_key = storage_client.upload_file(file.filename, content, file.content_type)
-    # Using same key for thumbnail for prototype
-    product = await product_service.update_image(product_id, object_key, object_key)
+    
+    # Generate thumbnail
+    try:
+        img = Image.open(BytesIO(content))
+        # Convert to RGB to ensure saving as JPEG/PNG works properly for some types
+        if img.mode != 'RGB':
+            img = img.convert('RGB')
+        img.thumbnail((150, 150))
+        thumb_io = BytesIO()
+        img.save(thumb_io, format="JPEG")
+        thumb_content = thumb_io.getvalue()
+        
+        parts = file.filename.rsplit(".", 1)
+        thumb_filename = f"{parts[0]}_thumb.jpg" if len(parts) > 1 else f"{file.filename}_thumb.jpg"
+        thumb_object_key = storage_client.upload_file(thumb_filename, thumb_content, "image/jpeg")
+    except Exception as e:
+        print(f"Thumbnail generation failed: {e}")
+        thumb_object_key = object_key
+        
+    product = await product_service.update_image(product_id, object_key, thumb_object_key, admin_id=current_admin)
     if not product:
          raise HTTPException(status_code=404, detail="Product not found")
          
     url = storage_client.get_file_url(object_key)
-    return ImageUploadResponse(image_url=url, thumbnail_url=url)
+    thumb_url = storage_client.get_file_url(thumb_object_key)
+    return ImageUploadResponse(image_url=url, thumbnail_url=thumb_url)

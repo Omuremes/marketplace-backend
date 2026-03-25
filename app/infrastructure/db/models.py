@@ -61,3 +61,14 @@ class OfferModel(Base):
 
     product: Mapped["ProductModel"] = relationship("ProductModel", back_populates="offers")
     seller: Mapped["SellerModel"] = relationship("SellerModel", back_populates="offers")
+
+class ProductAuditLogModel(Base):
+    __tablename__ = "product_audit_logs"
+
+    id: Mapped[str] = mapped_column(String, primary_key=True, default=lambda: str(uuid.uuid4()))
+    admin_id: Mapped[str] = mapped_column(ForeignKey("admins.id", ondelete="SET NULL"), nullable=True, index=True)
+    product_id: Mapped[str] = mapped_column(ForeignKey("products.id", ondelete="SET NULL"), nullable=True, index=True)
+    action: Mapped[str] = mapped_column(String, nullable=False) # e.g. "CREATE", "UPDATE", "DELETE"
+    changes_json: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=text("now()"), nullable=False)
+

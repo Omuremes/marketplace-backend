@@ -5,6 +5,7 @@ from app.persistence.repositories.product_repo import SqlAlchemyProductRepositor
 from app.persistence.repositories.seller_repo import SqlAlchemySellerRepository
 from app.persistence.repositories.offer_repo import SqlAlchemyOfferRepository
 from app.persistence.repositories.admin_repo import SqlAlchemyAdminRepository
+from app.persistence.repositories.audit_repo import SqlAlchemyAuditLogRepository
 
 class SqlAlchemyUnitOfWork(UnitOfWork):
     def __init__(self, session_factory=AsyncSessionLocal):
@@ -16,6 +17,7 @@ class SqlAlchemyUnitOfWork(UnitOfWork):
         self.sellers = SqlAlchemySellerRepository(self.session)
         self.offers = SqlAlchemyOfferRepository(self.session)
         self.admins = SqlAlchemyAdminRepository(self.session)
+        self.audit_logs = SqlAlchemyAuditLogRepository(self.session)
         return await super().__aenter__()
 
     async def __aexit__(self, exc_type, exc_val, exc_tb):

@@ -58,5 +58,4 @@ async def login(body: SellerLoginRequest, uow: UnitOfWork = Depends(get_uow)):
             detail={"error": "unauthorized", "message": "Incorrect email or password"}
         )
     access_token = AuthService.create_access_token(data={"sub": seller.email, "role": "seller"})
-    refresh_token = AuthService.create_refresh_token(data={"sub": seller.email, "role": "seller"})
-    return TokenResponse(access_token=access_token, refresh_token=refresh_token)
+

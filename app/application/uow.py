@@ -74,11 +74,17 @@ class OfferRepository(abc.ABC):
     async def list_by_product_id(self, product_id: str) -> List[Offer]:
         pass
 
+class AuditLogRepository(abc.ABC):
+    @abc.abstractmethod
+    async def add(self, admin_id: Optional[str], product_id: str, action: str, changes: Optional[dict] = None) -> None:
+        pass
+
 class UnitOfWork(abc.ABC):
     products: ProductRepository
     sellers: SellerRepository
     offers: OfferRepository
     admins: AdminRepository
+    audit_logs: AuditLogRepository
 
     async def __aenter__(self):
         return self

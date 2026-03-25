@@ -83,14 +83,16 @@ class ProductService:
         async with self.uow as uow:
             return await uow.products.get_by_id(product_id)
 
-    async def create_product(self, name: str, price_amount: float, price_currency: str, stock: int, attributes: List[Dict[str, str]]) -> Product:
+    async def create_product(self, name: str, price_amount: float, price_currency: str, stock: int, attributes: List[Dict[str, str]], admin_id: Optional[str] = None) -> Product:
         async with self.uow as uow:
             product = Product.create(name=name, price_amount=price_amount, price_currency=price_currency, stock=stock, attributes=attributes)
             await uow.products.add(product)
+            if admin_id:
+                await uow.audit_logs.add(admin_id=admin_id, product_id=product.id, action="CREATE", changes={"name": name})
             await uow.commit()
             return product
 
-    async def update_product(self, product_id: str, updates: Dict[str, Any]) -> Optional[Product]:
+    async def update_product(self, product_id: str, updates: Dict[str, Any], admin_id: Optional[str] = None) -> Optional[Product]:
         async with self.uow as uow:
             product = await uow.products.get_by_id(product_id)
             if not product:
@@ -108,19 +110,23 @@ class ProductService:
                 product.attributes = updates["attributes"]
             
             await uow.products.update(product)
+            if admin_id:
+                await uow.audit_logs.add(admin_id=admin_id, product_id=product.id, action="UPDATE", changes=updates)
             await uow.commit()
             return product
 
-    async def delete_product(self, product_id: str) -> bool:
+    async def delete_product(self, product_id: str, admin_id: Optional[str] = None) -> bool:
         async with self.uow as uow:
             product = await uow.products.get_by_id(product_id)
             if not product:
                 return False
             await uow.products.delete(product_id)
+            if admin_id:
+                await uow.audit_logs.add(admin_id=admin_id, product_id=product.id, action="DELETE", changes={"deleted": True})
             await uow.commit()
             return True
 
-    async def update_image(self, product_id: str, image_object_key: str, thumbnail_object_key: str) -> Optional[Product]:
+    async def update_image(self, product_id: str, image_object_key: str, thumbnail_object_key: str, admin_id: Optional[str] = None) -> Optional[Product]:
         async with self.uow as uow:
             product = await uow.products.get_by_id(product_id)
             if not product:
@@ -128,5 +134,7 @@ class ProductService:
             product.image_object_key = image_object_key
             product.thumbnail_object_key = thumbnail_object_key
             await uow.products.update(product)
+            if admin_id:
+                await uow.audit_logs.add(admin_id=admin_id, product_id=product_id, action="UPDATE_IMAGE", changes={"image_object_key": image_object_key})
             await uow.commit()
             return product
