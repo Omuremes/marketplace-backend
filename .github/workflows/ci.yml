@@ -24,7 +24,7 @@ jobs:
           --health-retries 5
         ports:
           - 5432:5432
-          
+
     steps:
     - uses: actions/checkout@v4
     
@@ -44,6 +44,23 @@ jobs:
       run: |
         cp .env.example .env
         echo "DATABASE_URL=postgresql+asyncpg://postgres:password@localhost:5432/marketplace_test" >> .env
+
+    - name: Start MinIO
+      run: |
+        docker run -d --name minio \
+          -p 9000:9000 \
+          -e MINIO_ROOT_USER=minioadmin \
+          -e MINIO_ROOT_PASSWORD=minioadmin \
+          minio/minio:latest server /data --console-address ":9001"
+
+    - name: Wait for MinIO
+      run: |
+        for i in {1..30}; do
+          curl -fsS http://localhost:9000/minio/health/live && exit 0
+          sleep 2
+        done
+        echo "MinIO did not become healthy in time" >&2
+        exit 1
         
     - name: Lint with ruff
       continue-on-error: true
