@@ -43,7 +43,13 @@ jobs:
     - name: Setup environment
       run: |
         cp .env.example .env
-        echo "DATABASE_URL=postgresql+asyncpg://postgres:password@localhost:5432/marketplace_test" >> .env
+        {
+          echo "POSTGRES_USER=postgres"
+          echo "POSTGRES_PASSWORD=password"
+          echo "POSTGRES_SERVER=localhost"
+          echo "POSTGRES_PORT=5432"
+          echo "POSTGRES_DB=marketplace_test"
+        } >> .env
 
     - name: Start MinIO
       run: |
