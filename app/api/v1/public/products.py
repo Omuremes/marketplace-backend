@@ -24,7 +24,7 @@ async def list_public_products(
 @router.get("/{product_id}", response_model=ProductDetailsDTO)
 async def get_product_details(
     product_id: str,
-    offers_sort: str = Query("price", regex="^(price|delivery_date)$"),
+    offers_sort: str = Query("price", pattern="^(price|delivery_date)$"),
     product_service: ProductService = Depends(get_product_service)
 ):
     details = await product_service.get_product_details(product_id=product_id, offers_sort=offers_sort)

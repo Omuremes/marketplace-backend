@@ -18,7 +18,6 @@ jobs:
           POSTGRES_PASSWORD: password
           POSTGRES_DB: marketplace_test
         options: >-
-          -- स्वास्थ्य-चेक (healthcheck)
           --health-cmd pg_isready
           --health-interval 10s
           --health-timeout 5s
