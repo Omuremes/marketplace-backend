@@ -37,10 +37,11 @@ class ImageUploadResponse(BaseModel):
 async def list_products(
     limit: int = Query(50, ge=1, le=100),
     cursor: Optional[str] = Query(None),
+    search: Optional[str] = Query(None, min_length=1),
     current_admin: str = Depends(get_current_admin),
     product_service: ProductService = Depends(get_product_service)
 ):
-    dtos, next_cursor = await product_service.list_products(limit=limit, cursor=cursor)
+    dtos, next_cursor = await product_service.list_products(limit=limit, cursor=cursor, search=search)
     
     admin_dtos = []
     for dto in dtos:

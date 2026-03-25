@@ -4,7 +4,7 @@ from app.application.services.offer_service import OfferService
 from app.application.dto.offer_dto import OfferCreateDTO, OfferUpdateDTO
 from app.application.dto.product_dto import MoneyDTO
 from pydantic import BaseModel
-from typing import List
+from typing import List, Optional
 from datetime import date
 from app.application.uow import UnitOfWork
 
@@ -14,6 +14,7 @@ class AdminOfferResponse(BaseModel):
     id: str
     product_id: str
     seller_id: str
+    seller_name: Optional[str] = None
     price: MoneyDTO
     delivery_date: date
 
@@ -29,6 +30,7 @@ async def list_offers(
             id=o.id,
             product_id=o.product_id,
             seller_id=o.seller_id,
+            seller_name=o.seller.name if getattr(o, "seller", None) else None,
             price=MoneyDTO(amount=o.price_amount, currency=o.price_currency),
             delivery_date=o.delivery_date
         ) for o in offers]
@@ -51,6 +53,7 @@ async def create_offer(
         id=offer.id,
         product_id=offer.product_id,
         seller_id=offer.seller_id,
+        seller_name=offer.seller.name if getattr(offer, "seller", None) else None,
         price=MoneyDTO(amount=offer.price_amount, currency=offer.price_currency),
         delivery_date=offer.delivery_date
     )
@@ -78,6 +81,7 @@ async def update_offer(
         id=offer.id,
         product_id=offer.product_id,
         seller_id=offer.seller_id,
+        seller_name=offer.seller.name if getattr(offer, "seller", None) else None,
         price=MoneyDTO(amount=offer.price_amount, currency=offer.price_currency),
         delivery_date=offer.delivery_date
     )

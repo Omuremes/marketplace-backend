@@ -5,7 +5,6 @@ from app.infrastructure.config.settings import settings
 from app.api.v1.public.products import router as public_products_router
 from app.api.v1.admin.auth import router as admin_auth_router
 from app.api.v1.admin.products import router as admin_products_router
-from app.api.v1.admin.sellers import router as admin_sellers_router
 from app.api.v1.admin.offers import router as admin_offers_router
 from app.api.v1.public.sellers import router as public_sellers_router
 
@@ -30,7 +29,6 @@ app.include_router(public_sellers_router, prefix=f"{settings.API_V1_STR}/public/
 # Admin
 app.include_router(admin_auth_router, prefix=f"{settings.API_V1_STR}/admin/auth", tags=["AdminAuth"])
 app.include_router(admin_products_router, prefix=f"{settings.API_V1_STR}/admin/products", tags=["AdminProducts"])
-app.include_router(admin_sellers_router, prefix=f"{settings.API_V1_STR}/admin/sellers", tags=["AdminSellers"])
 app.include_router(admin_offers_router, prefix=f"{settings.API_V1_STR}/admin", tags=["AdminOffers"])
 
 @app.get("/health")
