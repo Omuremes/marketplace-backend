@@ -71,6 +71,9 @@ jobs:
     - name: Lint with ruff
       continue-on-error: true
       run: poetry run ruff check app tests || true
+
+    - name: Run migrations
+      run: poetry run alembic upgrade head
       
     - name: Run Pytest
       run: poetry run pytest
